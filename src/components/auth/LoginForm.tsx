@@ -80,14 +80,6 @@ const LoginForm = () => {
               {isLoading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
-          
-          <div className="mt-6 text-center">
-            <div className="bg-luxury-black-light rounded-lg p-4 text-xs text-luxury-gold-light">
-              <p className="font-semibold mb-2">Demo Credentials:</p>
-              <p>Super Admin: superadmin@sirolevvipprotocolltd.co.ke / admin123</p>
-              <p>Sub Admin: subadmin@sirolevvipprotocolltd.co.ke / subadmin123</p>
-            </div>
-          </div>
         </Card>
       </div>
     </div>

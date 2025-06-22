@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../integrations/supabase/client';
 
 export type UserRole = 'super_admin' | 'sub_admin';
 
@@ -19,28 +20,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demonstration
-const mockUsers: Record<string, { password: string; user: User }> = {
-  'superadmin@sirolevvipprotocolltd.co.ke': {
-    password: 'admin123',
-    user: {
-      id: '1',
-      email: 'superadmin@sirolevvipprotocolltd.co.ke',
-      role: 'super_admin',
-      name: 'Super Administrator'
-    }
-  },
-  'subadmin@sirolevvipprotocolltd.co.ke': {
-    password: 'subadmin123',
-    user: {
-      id: '2',
-      email: 'subadmin@sirolevvipprotocolltd.co.ke',
-      role: 'sub_admin',
-      name: 'Sub Administrator'
-    }
-  }
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,19 +36,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const mockUser = mockUsers[email];
-    if (mockUser && mockUser.password === password) {
-      setUser(mockUser.user);
-      localStorage.setItem('sirole_admin_user', JSON.stringify(mockUser.user));
+    try {
+      // Query the admin_users table for authentication
+      const { data: adminUser, error } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (error || !adminUser) {
+        console.error('Login error:', error);
+        setIsLoading(false);
+        return false;
+      }
+
+      // For now, we'll use simple password matching
+      // In production, you should hash passwords
+      if (adminUser.password === password) {
+        const userData: User = {
+          id: adminUser.id,
+          email: adminUser.email,
+          role: adminUser.role as UserRole,
+          name: adminUser.email.split('@')[0] // Extract name from email for now
+        };
+        
+        setUser(userData);
+        localStorage.setItem('sirole_admin_user', JSON.stringify(userData));
+        setIsLoading(false);
+        return true;
+      }
+      
       setIsLoading(false);
-      return true;
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      setIsLoading(false);
+      return false;
     }
-    
-    setIsLoading(false);
-    return false;
   };
 
   const logout = () => {

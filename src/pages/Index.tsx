@@ -1,12 +1,26 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import LoginForm from '../components/auth/LoginForm';
+import AdminDashboard from '../components/dashboard/AdminDashboard';
 
 const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-luxury-black">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-luxury-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-luxury-gold">Loading SIROLE VVIP Dashboard...</p>
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-luxury-black">
+      {user ? <AdminDashboard /> : <LoginForm />}
     </div>
   );
 };

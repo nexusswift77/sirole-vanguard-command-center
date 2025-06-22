@@ -25,49 +25,99 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user session
-    const storedUser = localStorage.getItem('sirole_admin_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    // Check for existing session on mount
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await fetchUserProfile(session.user.id);
+      }
+      setIsLoading(false);
+    };
+
+    checkSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          await fetchUserProfile(session.user.id);
+        } else {
+          setUser(null);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data: adminProfile, error } = await supabase
+        .from('admin_users')
+        .select('id, email, role, created_at')
+        .eq('id', userId)
+        .single();
+
+      if (error || !adminProfile) {
+        console.error('Error fetching admin profile:', error);
+        await supabase.auth.signOut();
+        return;
+      }
+
+      const userData: User = {
+        id: adminProfile.id,
+        email: adminProfile.email,
+        role: adminProfile.role as UserRole,
+        name: adminProfile.email.split('@')[0]
+      };
+      
+      setUser(userData);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      await supabase.auth.signOut();
+    }
+  };
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     
     try {
-      // Query the admin_users table for authentication
-      const { data: adminUser, error } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('email', email)
-        .single();
+      // Use Supabase Auth for secure authentication
+      const { data: { user: authUser, session }, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-      if (error || !adminUser) {
-        console.error('Login error:', error);
+      if (authError || !authUser || !session) {
+        console.error('Authentication error:', authError);
         setIsLoading(false);
         return false;
       }
 
-      // For now, we'll use simple password matching
-      // In production, you should hash passwords
-      if (adminUser.password === password) {
-        const userData: User = {
-          id: adminUser.id,
-          email: adminUser.email,
-          role: adminUser.role as UserRole,
-          name: adminUser.email.split('@')[0] // Extract name from email for now
-        };
-        
-        setUser(userData);
-        localStorage.setItem('sirole_admin_user', JSON.stringify(userData));
+      // After successful authentication, fetch admin profile
+      const { data: adminProfile, error: profileError } = await supabase
+        .from('admin_users')
+        .select('id, email, role, created_at')
+        .eq('id', authUser.id)
+        .single();
+
+      if (profileError || !adminProfile) {
+        console.error('Admin profile not found:', profileError);
+        await supabase.auth.signOut();
         setIsLoading(false);
-        return true;
+        return false;
       }
+
+      const userData: User = {
+        id: adminProfile.id,
+        email: adminProfile.email,
+        role: adminProfile.role as UserRole,
+        name: adminProfile.email.split('@')[0]
+      };
       
+      setUser(userData);
       setIsLoading(false);
-      return false;
+      return true;
     } catch (error) {
       console.error('Login error:', error);
       setIsLoading(false);
@@ -75,9 +125,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('sirole_admin_user');
   };
 
   return (
